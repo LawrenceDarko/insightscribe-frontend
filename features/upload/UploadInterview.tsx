@@ -11,7 +11,7 @@ import {
   type FileUploadStatus,
 } from "./UploadFileItem";
 import { Button, Card, CardContent, Input } from "@/components/ui";
-import type { InterviewStatus } from "@/types";
+import type { Interview, InterviewStatus } from "@/types";
 
 const ACCEPT = ".mp3,.wav,.mp4";
 const MAX_SIZE_MB = 200;
@@ -87,7 +87,13 @@ export function UploadInterview({ projectId }: { projectId: string }) {
   );
 
   const queueProcessingInterview = useCallback(
-    (itemId: string, interview: { id: string; status: InterviewStatus; processing_progress?: number }) => {
+    (
+      itemId: string,
+      interview: Pick<
+        Interview,
+        "id" | "status" | "processing_progress" | "processing_error"
+      >
+    ) => {
       patch(itemId, {
         status: "processing",
         progress: 100,
