@@ -9,6 +9,7 @@ const tabs = [
   { href: (id: string) => `/projects/${id}/upload`, label: "Upload" },
   { href: (id: string) => `/projects/${id}/chat`, label: "Chat" },
   { href: (id: string) => `/projects/${id}/insights`, label: "Insights" },
+  { href: (id: string) => `/projects/${id}/summary-notes`, label: "Summary Notes" },
 ];
 
 export function ProjectNav({ projectId }: { projectId: string }) {

@@ -17,7 +17,7 @@ export interface ApiErrorEnvelope {
   error: {
     code: string;
     message: string;
-    details?: Record<string, string[]>;
+    details?: Record<string, unknown>;
   };
 }
 
@@ -91,6 +91,7 @@ export interface Interview {
   id: string;
   project_id: string;
   title?: string;
+  source_type?: "file" | "transcript" | "link";
   file_url?: string;
   file_name: string;
   file_size?: number;
@@ -277,7 +278,8 @@ export interface ApiError {
   error?: {
     code: string;
     message: string;
-    details?: Record<string, string[]>;
+    details?: Record<string, unknown>;
   };
+  details?: Record<string, unknown>;
   [key: string]: unknown;
 }

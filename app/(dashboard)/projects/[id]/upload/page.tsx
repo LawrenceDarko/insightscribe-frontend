@@ -8,8 +8,8 @@ export default function UploadPage({ params }: { params: { id: string } }) {
           Upload interviews
         </h1>
         <p className="mt-1 text-sm text-surface-500 dark:text-surface-400">
-          Upload audio or video recordings of customer interviews. Supported
-          formats: MP3, WAV, MP4.
+          Add interviews using one of three methods: upload audio/video files,
+          paste manual transcript text, or submit a direct media URL.
         </p>
       </div>
       <UploadInterview projectId={params.id} />

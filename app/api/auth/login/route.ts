@@ -37,7 +37,8 @@ export async function POST(request: NextRequest) {
     if (!res.ok) {
       // Extract error message from Django envelope
       const errMsg = envelope?.error?.message ?? envelope?.detail ?? "Login failed";
-      return NextResponse.json({ detail: errMsg }, { status: res.status });
+      const details = envelope?.error?.details;
+      return NextResponse.json({ detail: errMsg, details }, { status: res.status });
     }
 
     // Django returns: { success: true, data: { user: {...}, tokens: { access, refresh } } }

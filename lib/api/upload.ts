@@ -17,6 +17,16 @@ export interface UploadCallbacks {
   signal?: AbortSignal;
 }
 
+export interface TranscriptUploadPayload {
+  title?: string;
+  transcript_text: string;
+}
+
+export interface LinkUploadPayload {
+  title?: string;
+  media_url: string;
+}
+
 export const uploadApi = {
   /**
    * Upload an interview file directly to the backend.
@@ -77,6 +87,55 @@ export const uploadApi = {
         ? body.data
         : body;
 
+    return {
+      ...interview,
+      status: interview.status ?? interview.processing_status,
+    };
+  },
+
+  uploadTranscript: async (
+    projectId: string,
+    payload: TranscriptUploadPayload
+  ): Promise<Interview> => {
+    if (DEV_MODE) {
+      const interview = devCreateInterview(
+        projectId,
+        payload.title || "manual-transcript.txt",
+        payload.transcript_text.length
+      );
+      devSimulateProcessing(projectId, interview.id);
+      return devGetInterview(projectId, interview.id)!;
+    }
+
+    const interview = await api.post<Interview>(
+      `/projects/${projectId}/interviews/`,
+      payload
+    );
+    return {
+      ...interview,
+      status: interview.status ?? interview.processing_status,
+    };
+  },
+
+  uploadMediaLink: async (
+    projectId: string,
+    payload: LinkUploadPayload
+  ): Promise<Interview> => {
+    if (DEV_MODE) {
+      const fallbackName = payload.media_url.split("/").pop() || "external-media";
+      const interview = devCreateInterview(
+        projectId,
+        payload.title || fallbackName,
+        0
+      );
+      devSimulateProcessing(projectId, interview.id);
+      return devGetInterview(projectId, interview.id)!;
+    }
+
+    const interview = await api.post<Interview>(
+      `/projects/${projectId}/interviews/`,
+      payload
+    );
     return {
       ...interview,
       status: interview.status ?? interview.processing_status,

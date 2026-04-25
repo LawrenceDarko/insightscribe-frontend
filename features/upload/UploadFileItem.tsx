@@ -15,7 +15,13 @@ export type FileUploadStatus =
 
 export interface UploadFileState {
   id: string; // unique per queued file
-  file: File;
+  kind: "file" | "transcript" | "link";
+  label: string;
+  file?: File;
+  sizeBytes?: number;
+  title?: string;
+  transcriptText?: string;
+  mediaUrl?: string;
   status: FileUploadStatus;
   progress: number; // 0–100
   error?: string;
@@ -38,7 +44,10 @@ export function UploadFileItem({
   onRetry,
   onRemove,
 }: UploadFileItemProps) {
-  const sizeMB = (item.file.size / 1024 / 1024).toFixed(1);
+  const sizeMB =
+    typeof item.sizeBytes === "number" ? (item.sizeBytes / 1024 / 1024).toFixed(1) : null;
+  const sourceLabel =
+    item.kind === "file" ? "File" : item.kind === "transcript" ? "Transcript" : "Media link";
 
   const progressVariant =
     item.status === "error" || item.status === "cancelled"
@@ -65,11 +74,12 @@ export function UploadFileItem({
           <div className="flex items-center gap-2">
             <FileIcon status={item.status} />
             <p className="truncate text-sm font-medium text-surface-900 dark:text-surface-100">
-              {item.file.name}
+              {item.label}
             </p>
           </div>
           <p className="mt-0.5 text-xs text-surface-500 dark:text-surface-400">
-            {sizeMB} MB
+            {sourceLabel}
+            {sizeMB ? ` · ${sizeMB} MB` : ""}
             {item.interviewStatus && (
               <>
                 {" "}

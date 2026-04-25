@@ -34,7 +34,8 @@ export async function POST(_request: NextRequest) {
     if (!res.ok) {
       cookieStore.delete(REFRESH_COOKIE);
       const errMsg = envelope?.error?.message ?? "Token refresh failed";
-      return NextResponse.json({ detail: errMsg }, { status: res.status });
+      const details = envelope?.error?.details;
+      return NextResponse.json({ detail: errMsg, details }, { status: res.status });
     }
 
     // Django returns: { success: true, data: { tokens: { access, refresh } } }

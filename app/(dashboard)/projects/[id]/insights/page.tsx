@@ -17,7 +17,7 @@ function InsightsSkeleton() {
 export default function InsightsPage({ params }: { params: { id: string } }) {
   return (
     <div className="space-y-8">
-      <h1 className="text-2xl font-bold text-surface-900">Insights</h1>
+      <h1 className="text-2xl font-bold text-surface-900 dark:text-white">Insights</h1>
       <Suspense fallback={<InsightsSkeleton />}>
         <InsightsView projectId={params.id} />
       </Suspense>

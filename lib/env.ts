@@ -14,5 +14,5 @@ export const env = {
   apiUrl: getEnv("NEXT_PUBLIC_API_URL").replace(/\/$/, ""),
   appUrl:
     getEnv("NEXT_PUBLIC_APP_URL").replace(/\/$/, "") ||
-    (typeof window !== "undefined" ? window.location.origin : ""),
+    (typeof window !== "undefined" ? window.location.origin : "http://localhost:3000"),
 } as const;

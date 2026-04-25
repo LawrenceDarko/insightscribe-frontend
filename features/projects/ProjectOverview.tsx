@@ -18,6 +18,7 @@ import {
   ConfirmDialog,
 } from "@/components/ui";
 import { formatDate, formatDateTime } from "@/lib/utils";
+import { EditProjectModal } from "@/features/projects/EditProjectModal";
 
 const POLL_INTERVAL = 3_000;
 const ACTIVE_STATES: InterviewStatus[] = ["uploaded", "transcribing", "embedding"];
@@ -27,6 +28,7 @@ export function ProjectOverview({ projectId }: { projectId: string }) {
   const [interviews, setInterviews] = useState<Interview[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isEditOpen, setIsEditOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Interview | null>(null);
   const [deleting, setDeleting] = useState(false);
   const pollTimer = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -159,7 +161,17 @@ export function ProjectOverview({ projectId }: { projectId: string }) {
                 </p>
               )}
             </div>
-            {project.status && <ProjectStatusBadge status={project.status} />}
+            <div className="flex items-center gap-2">
+              {project.status && <ProjectStatusBadge status={project.status} />}
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsEditOpen(true)}
+              >
+                Rename
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent className="text-xs text-surface-500 dark:text-surface-400">
@@ -208,7 +220,7 @@ export function ProjectOverview({ projectId }: { projectId: string }) {
         ) : (
           <ul className="space-y-2">
             {interviews.map((interview) => (
-              <li key={interview.id}>
+              <li key={interview.id} id={`interview-${interview.id}`} className="scroll-mt-24">
                 <Card className="transition-colors hover:border-surface-300 dark:hover:border-surface-600">
                   <CardContent className="flex flex-col gap-2 py-3">
                     <div className="flex flex-wrap items-center justify-between gap-3">
@@ -276,6 +288,16 @@ export function ProjectOverview({ projectId }: { projectId: string }) {
         confirmLabel="Delete"
         variant="danger"
       />
+
+      {isEditOpen && (
+        <EditProjectModal
+          project={project}
+          onClose={() => setIsEditOpen(false)}
+          onUpdated={(updated) => {
+            setProject((prev) => (prev ? { ...prev, ...updated } : updated));
+          }}
+        />
+      )}
     </div>
   );
 }

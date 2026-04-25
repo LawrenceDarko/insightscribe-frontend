@@ -116,10 +116,7 @@ client.interceptors.response.use(
     if (err.response?.status === 401 && !config._retry) {
       config._retry = true;
       try {
-        const base =
-          typeof window !== "undefined"
-            ? window.location.origin
-            : env.appUrl || env.apiUrl;
+        const base = env.appUrl;
         const res = await axios.post<{ access: string }>(
           `${base}/api/auth/refresh`,
           undefined,
@@ -252,28 +249,79 @@ function withSilent(opts?: RequestOptions): AxiosRequestConfig | undefined {
 /* ------------------------------------------------------------------ */
 
 export function getErrorMessage(err: unknown): string {
+  const formatValidationDetails = (details: unknown): string | undefined => {
+    const collect = (value: unknown, path = ""): string[] => {
+      if (typeof value === "string") {
+        return [path ? `${path}: ${value}` : value];
+      }
+
+      if (typeof value === "number" || typeof value === "boolean") {
+        return [path ? `${path}: ${String(value)}` : String(value)];
+      }
+
+      if (Array.isArray(value)) {
+        return value.flatMap((item) => collect(item, path));
+      }
+
+      if (value && typeof value === "object") {
+        return Object.entries(value as Record<string, unknown>).flatMap(
+          ([key, nested]) => collect(nested, path ? `${path}.${key}` : key)
+        );
+      }
+
+      return [];
+    };
+
+    const messages = collect(details).filter(Boolean);
+    if (messages.length === 0) return undefined;
+    return messages.slice(0, 3).join(" • ");
+  };
+
   // Axios error with response body
   if (axios.isAxiosError(err) && err.response?.data) {
     const d = err.response.data as ApiError;
+    const details =
+      (d.error && typeof d.error === "object" && d.error.details) ||
+      (d as { details?: unknown }).details;
 
     // Django envelope error: { success: false, error: { code, message, details } }
     if (d.error && typeof d.error === "object" && "message" in d.error) {
-      return d.error.message;
+      const detailMessage = formatValidationDetails(details);
+      return detailMessage ? `${d.error.message} ${detailMessage}` : d.error.message;
     }
 
-    if (typeof d.detail === "string") return d.detail;
-    if (typeof d.message === "string") return d.message;
+    if (typeof d.detail === "string") {
+      const detailMessage = formatValidationDetails(details);
+      return detailMessage ? `${d.detail} ${detailMessage}` : d.detail;
+    }
+
+    if (typeof d.message === "string") {
+      const detailMessage = formatValidationDetails(details);
+      return detailMessage ? `${d.message} ${detailMessage}` : d.message;
+    }
+
     if (
       typeof d.detail === "object" &&
       d.detail !== null &&
       "message" in d.detail
     ) {
-      return String((d.detail as { message?: string }).message);
+      const detailMessage = formatValidationDetails(
+        (d.detail as { details?: unknown }).details ?? details
+      );
+      const message = String((d.detail as { message?: string }).message);
+      return detailMessage ? `${message} ${detailMessage}` : message;
     }
+
+    const detailMessage = formatValidationDetails(details);
+    if (detailMessage) {
+      return detailMessage;
+    }
+
     // Field-level validation errors (Django REST Framework style)
-    const firstKey = Object.keys(d).find(
-      (k) => Array.isArray(d[k]) && (d[k] as string[]).length > 0
-    );
+    const firstKey = Object.keys(d).find((k) => {
+      const value = d[k];
+      return Array.isArray(value) && value.length > 0;
+    });
     if (firstKey) {
       return `${firstKey}: ${(d[firstKey] as string[])[0]}`;
     }
@@ -287,8 +335,17 @@ export function getErrorMessage(err: unknown): string {
     (err as { response?: { data?: ApiError } }).response?.data
   ) {
     const d = (err as { response: { data: ApiError } }).response.data;
-    if (typeof d.detail === "string") return d.detail;
-    if (typeof d.message === "string") return d.message;
+    const details =
+      (d.error && typeof d.error === "object" && d.error.details) ||
+      (d as { details?: unknown }).details;
+    if (typeof d.detail === "string") {
+      const detailMessage = formatValidationDetails(details);
+      return detailMessage ? `${d.detail} ${detailMessage}` : d.detail;
+    }
+    if (typeof d.message === "string") {
+      const detailMessage = formatValidationDetails(details);
+      return detailMessage ? `${d.message} ${detailMessage}` : d.message;
+    }
   }
 
   // Network / timeout

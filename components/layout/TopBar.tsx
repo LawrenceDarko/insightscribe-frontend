@@ -1,9 +1,13 @@
 "use client";
 
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSidebar } from "@/contexts/SidebarContext";
 import { useTheme } from "@/contexts/ThemeContext";
+import { projectsApi } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import type { Interview, Project } from "@/types";
 
 /* ------------------------------------------------------------------ */
 /*  Tiny inline icons                                                 */
@@ -21,6 +25,14 @@ function IconSearch({ className }: { className?: string }) {
   return (
     <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
       <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+    </svg>
+  );
+}
+
+function IconChevronRight({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" d="m9 5 7 7-7 7" />
     </svg>
   );
 }
@@ -100,6 +112,16 @@ function ThemeToggle() {
 export function TopBar() {
   const { user } = useAuth();
   const { setMobileOpen } = useSidebar();
+  const router = useRouter();
+  const searchRef = useRef<HTMLDivElement | null>(null);
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const [query, setQuery] = useState("");
+  const [isFocused, setIsFocused] = useState(false);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [interviews, setInterviews] = useState<Array<Interview & { project_name: string }>>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
+  const [interviewsLoaded, setInterviewsLoaded] = useState(false);
 
   const initials = (user?.full_name || user?.email || "U")
     .split(/[\s@]+/)
@@ -107,8 +129,159 @@ export function TopBar() {
     .map((s) => s.charAt(0).toUpperCase())
     .join("");
 
+  useEffect(() => {
+    let active = true;
+
+    projectsApi
+      .list()
+      .then((items) => {
+        if (active) {
+          setProjects(items);
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setSearchError("Search is temporarily unavailable");
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isFocused || interviewsLoaded || projects.length === 0) {
+      return;
+    }
+
+    let active = true;
+    setSearchLoading(true);
+
+    Promise.all(
+      projects.map(async (project) => {
+        const list = await projectsApi.listInterviews(project.id);
+        return list.map((interview) => ({
+          ...interview,
+          project_name: project.name,
+        }));
+      })
+    )
+      .then((lists) => {
+        if (!active) return;
+        setInterviews(lists.flat());
+        setInterviewsLoaded(true);
+      })
+      .catch(() => {
+        if (active) {
+          setSearchError("Search is temporarily unavailable");
+        }
+      })
+      .finally(() => {
+        if (active) {
+          setSearchLoading(false);
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [isFocused, interviewsLoaded, projects]);
+
+  useEffect(() => {
+    const handlePointerDown = (event: MouseEvent) => {
+      if (!searchRef.current?.contains(event.target as Node)) {
+        setIsFocused(false);
+      }
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        inputRef.current?.focus();
+        setIsFocused(true);
+      }
+
+      if (event.key === "Escape") {
+        setIsFocused(false);
+        inputRef.current?.blur();
+      }
+    };
+
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, []);
+
+  const searchResults = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase();
+
+    if (!normalizedQuery) {
+      return { projects: projects.slice(0, 5), interviews: interviews.slice(0, 5) };
+    }
+
+    const scoreMatch = (text: string) => {
+      const normalizedText = text.toLowerCase();
+      if (!normalizedText.includes(normalizedQuery)) {
+        return 0;
+      }
+
+      let score = 1;
+      if (normalizedText.startsWith(normalizedQuery)) score += 4;
+      if (normalizedText === normalizedQuery) score += 3;
+      if (normalizedText.includes(` ${normalizedQuery}`)) score += 1;
+      return score;
+    };
+
+    const matchingProjects = projects
+      .map((project) => ({
+        project,
+        score: scoreMatch(`${project.name} ${project.description ?? ""}`),
+      }))
+      .filter((entry) => entry.score > 0)
+      .sort((a, b) => b.score - a.score || a.project.name.localeCompare(b.project.name))
+      .map((entry) => entry.project);
+
+    const matchingInterviews = interviews
+      .map((interview) => ({
+        interview,
+        score: scoreMatch(`${interview.file_name} ${interview.title ?? ""} ${interview.project_name}`),
+      }))
+      .filter((entry) => entry.score > 0)
+      .sort(
+        (a, b) =>
+          b.score - a.score ||
+          a.interview.project_name.localeCompare(b.interview.project_name) ||
+          a.interview.file_name.localeCompare(b.interview.file_name)
+      )
+      .map((entry) => entry.interview);
+
+    return {
+      projects: matchingProjects.slice(0, 5),
+      interviews: matchingInterviews.slice(0, 5),
+    };
+  }, [interviews, projects, query]);
+
+  const showDropdown = isFocused && (query.trim().length > 0 || projects.length > 0);
+
+  function openProject(projectId: string) {
+    setQuery("");
+    setIsFocused(false);
+    router.push(`/projects/${projectId}`);
+  }
+
+  function openInterview(interview: Interview) {
+    setQuery("");
+    setIsFocused(false);
+    router.push(`/projects/${interview.project_id}#interview-${interview.id}`);
+  }
+
   return (
-    <header className="flex h-16 shrink-0 items-center gap-4 border-b border-surface-200/80 bg-white/80 px-4 sm:px-6 backdrop-blur-xl dark:border-surface-800 dark:bg-surface-900/80">
+    <header className="relative z-30 flex h-16 shrink-0 items-center gap-4 border-b border-surface-200/80 bg-white/80 px-4 sm:px-6 backdrop-blur-xl dark:border-surface-800 dark:bg-surface-900/80">
       {/* Mobile hamburger */}
       <button
         type="button"
@@ -120,17 +293,106 @@ export function TopBar() {
       </button>
 
       {/* Search bar */}
-      <div className="hidden sm:flex max-w-md flex-1">
+      <div ref={searchRef} className="relative z-30 hidden sm:flex max-w-md flex-1">
         <div className="relative w-full">
           <IconSearch className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-surface-400" />
           <input
+            ref={inputRef}
             type="text"
             placeholder="Search projects, interviews..."
-            className="h-9 w-full rounded-xl border border-surface-200 bg-surface-50 pl-9 pr-12 text-sm text-surface-900 placeholder:text-surface-400 transition-colors focus:border-primary-300 focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-500/20 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-100 dark:placeholder:text-surface-500 dark:focus:border-primary-500 dark:focus:bg-surface-800"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            onFocus={() => setIsFocused(true)}
+            className="h-9 w-full rounded-xl border border-surface-200 bg-surface-50 pl-9 pr-20 text-sm text-surface-900 placeholder:text-surface-400 transition-colors focus:border-primary-300 focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-500/20 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-100 dark:placeholder:text-surface-500 dark:focus:border-primary-500 dark:focus:bg-surface-800"
           />
-          <kbd className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 hidden sm:inline-flex items-center gap-0.5 rounded-md border border-surface-200 bg-white px-1.5 py-0.5 text-[10px] font-medium text-surface-400 dark:border-surface-600 dark:bg-surface-700 dark:text-surface-500">
-            ⌘K
-          </kbd>
+          <div className="pointer-events-none absolute right-2.5 top-1/2 flex -translate-y-1/2 items-center gap-1">
+            {query && (
+              <span className="hidden rounded-md bg-surface-200 px-1.5 py-0.5 text-[10px] font-medium text-surface-500 dark:bg-surface-700 dark:text-surface-400 sm:inline-flex">
+                Esc
+              </span>
+            )}
+            <kbd className="hidden items-center gap-0.5 rounded-md border border-surface-200 bg-white px-1.5 py-0.5 text-[10px] font-medium text-surface-400 dark:border-surface-600 dark:bg-surface-700 dark:text-surface-500 sm:inline-flex">
+              ⌘K
+            </kbd>
+          </div>
+
+          {showDropdown && (
+            <div className="absolute left-0 right-0 top-[calc(100%+0.5rem)] z-[70] overflow-hidden rounded-2xl border border-surface-200 bg-white shadow-2xl shadow-surface-950/10 ring-1 ring-black/5 dark:border-surface-700 dark:bg-surface-900 dark:shadow-black/30">
+              <div className="border-b border-surface-100 px-4 py-3 text-xs font-medium uppercase tracking-wide text-surface-400 dark:border-surface-800">
+                {searchLoading ? "Searching interviews..." : query.trim() ? `Results for “${query.trim()}”` : "Recent projects and interviews"}
+              </div>
+
+              {searchError ? (
+                <div className="px-4 py-6 text-sm text-surface-500 dark:text-surface-400">{searchError}</div>
+              ) : (
+                <div className="max-h-[28rem] overflow-y-auto p-2">
+                  {searchResults.projects.length === 0 && searchResults.interviews.length === 0 ? (
+                    <div className="px-3 py-10 text-center text-sm text-surface-500 dark:text-surface-400">
+                      No projects or interviews match your search.
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {searchResults.projects.length > 0 && (
+                        <div>
+                          <div className="px-3 pb-2 text-[11px] font-semibold uppercase tracking-wide text-surface-400 dark:text-surface-500">
+                            Projects
+                          </div>
+                          <div className="space-y-1">
+                            {searchResults.projects.map((project) => (
+                              <button
+                                key={project.id}
+                                type="button"
+                                onClick={() => openProject(project.id)}
+                                className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-left transition-colors hover:bg-surface-100 dark:hover:bg-surface-800"
+                              >
+                                <div className="min-w-0">
+                                  <div className="truncate text-sm font-medium text-surface-900 dark:text-surface-100">
+                                    {project.name}
+                                  </div>
+                                  <div className="truncate text-xs text-surface-500 dark:text-surface-400">
+                                    {project.description ?? `${project.interview_count ?? 0} interviews`}
+                                  </div>
+                                </div>
+                                <IconChevronRight className="ml-3 h-4 w-4 shrink-0 text-surface-300 dark:text-surface-600" />
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {searchResults.interviews.length > 0 && (
+                        <div>
+                          <div className="px-3 pb-2 text-[11px] font-semibold uppercase tracking-wide text-surface-400 dark:text-surface-500">
+                            Interviews
+                          </div>
+                          <div className="space-y-1">
+                            {searchResults.interviews.map((interview) => (
+                              <button
+                                key={interview.id}
+                                type="button"
+                                onClick={() => openInterview(interview)}
+                                className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-left transition-colors hover:bg-surface-100 dark:hover:bg-surface-800"
+                              >
+                                <div className="min-w-0">
+                                  <div className="truncate text-sm font-medium text-surface-900 dark:text-surface-100">
+                                    {interview.title || interview.file_name}
+                                  </div>
+                                  <div className="truncate text-xs text-surface-500 dark:text-surface-400">
+                                    {interview.project_name} · {interview.file_name}
+                                  </div>
+                                </div>
+                                <IconChevronRight className="ml-3 h-4 w-4 shrink-0 text-surface-300 dark:text-surface-600" />
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 

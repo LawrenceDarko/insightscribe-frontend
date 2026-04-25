@@ -13,18 +13,12 @@ interface DropZoneProps {
   className?: string;
 }
 
-const VALID_EXTENSIONS = /\.(mp3|wav|mp4|m4a|webm|ogg)$/i;
+const VALID_EXTENSIONS = /\.(mp3|wav|mp4)$/i;
 const VALID_TYPES = new Set([
   "audio/mpeg",
   "audio/wav",
   "audio/mp3",
-  "audio/mp4",
-  "audio/m4a",
-  "audio/x-m4a",
-  "audio/ogg",
-  "audio/webm",
   "video/mp4",
-  "video/webm",
 ]);
 
 export function DropZone({
