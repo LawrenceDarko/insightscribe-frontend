@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { ToastProvider } from "@/contexts/ToastContext";
+import { Analytics } from "@vercel/analytics/next"
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -37,6 +38,7 @@ export default function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
       </head>
       <body className="bg-surface-50 text-surface-900 dark:bg-surface-900 dark:text-surface-50 antialiased">
+        <Analytics/>
         <ThemeProvider>
           <ToastProvider>
             <AuthProvider>{children}</AuthProvider>
