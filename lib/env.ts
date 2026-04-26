@@ -5,7 +5,7 @@
 function getEnv(key: "NEXT_PUBLIC_API_URL" | "NEXT_PUBLIC_APP_URL"): string {
   const value = process.env[key];
   if (typeof value !== "string" || !value.trim()) {
-    return key === "NEXT_PUBLIC_API_URL" ? "http://localhost:8000/api/v1" : "";
+    return key === "NEXT_PUBLIC_API_URL" ? "NEXT_PUBLIC_API_URL" : "http://localhost:8000/api/v1";
   }
   return value.trim();
 }
