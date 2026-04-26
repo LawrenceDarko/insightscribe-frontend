@@ -154,7 +154,6 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         limit={MAX_TOASTS}
         theme="colored"
         toastClassName={(ctx) => `rounded-lg shadow-lg ${mapClassName(ctx?.type)}`}
-        bodyClassName="m-0"
         progressClassName="!bg-white/50"
       />
     </ToastContext.Provider>
