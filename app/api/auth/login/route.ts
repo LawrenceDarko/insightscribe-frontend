@@ -26,7 +26,8 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? "";
+    // const apiUrl = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? "";
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL;
     const res = await fetch(`${apiUrl}/auth/login/`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
