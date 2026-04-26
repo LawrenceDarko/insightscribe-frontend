@@ -4,13 +4,15 @@ import {
   createContext,
   useCallback,
   useContext,
-  useEffect,
-  useRef,
-  useState,
   type ReactNode,
 } from "react";
-import { createPortal } from "react-dom";
-import { cn } from "@/lib/utils";
+import {
+  ToastContainer,
+  toast,
+  type ToastContent,
+  type ToastOptions,
+  type Id,
+} from "react-toastify";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -60,136 +62,47 @@ export function getToast(): ToastContextValue | null {
   return _globalToast;
 }
 
-/* ------------------------------------------------------------------ */
-/*  Icons (inline SVG — zero deps)                                     */
-/* ------------------------------------------------------------------ */
+const MAX_TOASTS = 5;
 
-const icons: Record<ToastVariant, ReactNode> = {
-  success: (
-    <svg className="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-    </svg>
-  ),
-  error: (
-    <svg className="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
-    </svg>
-  ),
-  warning: (
-    <svg className="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-    </svg>
-  ),
-  info: (
-    <svg className="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-    </svg>
-  ),
-};
+function mapType(variant: ToastVariant): ToastOptions["type"] {
+  if (variant === "success") return "success";
+  if (variant === "error") return "error";
+  if (variant === "warning") return "warning";
+  return "info";
+}
 
-const variantStyles: Record<ToastVariant, string> = {
-  success:
-    "border-green-500/30 bg-green-50 text-green-800 dark:bg-green-950/60 dark:text-green-200 dark:border-green-500/40",
-  error:
-    "border-red-500/30 bg-red-50 text-red-800 dark:bg-red-950/60 dark:text-red-200 dark:border-red-500/40",
-  warning:
-    "border-yellow-500/30 bg-yellow-50 text-yellow-800 dark:bg-yellow-950/60 dark:text-yellow-200 dark:border-yellow-500/40",
-  info:
-    "border-primary-500/30 bg-primary-50 text-primary-800 dark:bg-primary-950/60 dark:text-primary-200 dark:border-primary-500/40",
-};
-
-/* ------------------------------------------------------------------ */
-/*  Single Toast Item                                                  */
-/* ------------------------------------------------------------------ */
-
-function ToastItem({
-  toast,
-  onDismiss,
-}: {
-  toast: Toast;
-  onDismiss: (id: string) => void;
-}) {
-  const [exiting, setExiting] = useState(false);
-
-  const dismiss = useCallback(() => {
-    setExiting(true);
-    setTimeout(() => onDismiss(toast.id), 200);
-  }, [onDismiss, toast.id]);
-
-  // Auto-dismiss timer
-  const timerRef = useRef<ReturnType<typeof setTimeout>>();
-  const duration = toast.duration ?? 5000;
-
-  // Start timer on mount
-  useState(() => {
-    if (duration > 0) {
-      timerRef.current = setTimeout(dismiss, duration);
-    }
-  });
-
+function buildContent(title: string, description?: string): ToastContent {
   return (
-    <div
-      role="alert"
-      className={cn(
-        "pointer-events-auto flex w-full max-w-sm items-start gap-3 rounded-lg border px-4 py-3 shadow-lg transition-all duration-200",
-        variantStyles[toast.variant],
-        exiting ? "translate-x-full opacity-0" : "translate-x-0 opacity-100"
-      )}
-      onMouseEnter={() => {
-        if (timerRef.current) clearTimeout(timerRef.current);
-      }}
-      onMouseLeave={() => {
-        if (duration > 0) {
-          timerRef.current = setTimeout(dismiss, duration);
-        }
-      }}
-    >
-      {icons[toast.variant]}
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium leading-5">{toast.title}</p>
-        {toast.description && (
-          <p className="mt-0.5 text-xs opacity-80 leading-4">{toast.description}</p>
-        )}
-      </div>
-      <button
-        onClick={dismiss}
-        className="shrink-0 rounded p-0.5 opacity-60 hover:opacity-100 transition-opacity"
-        aria-label="Dismiss"
-      >
-        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-        </svg>
-      </button>
+    <div className="space-y-1">
+      <p className="text-sm font-semibold leading-5">{title}</p>
+      {description ? <p className="text-xs leading-4 opacity-95">{description}</p> : null}
     </div>
   );
+}
+
+function mapClassName(type?: string): string {
+  if (type === "error") return "bg-red-700 text-white border border-red-300";
+  if (type === "success") return "bg-emerald-700 text-white border border-emerald-300";
+  if (type === "warning") return "bg-amber-600 text-white border border-amber-300";
+  return "bg-blue-700 text-white border border-blue-300";
 }
 
 /* ------------------------------------------------------------------ */
 /*  Provider                                                           */
 /* ------------------------------------------------------------------ */
 
-const MAX_TOASTS = 5;
-
 export function ToastProvider({ children }: { children: ReactNode }) {
-  const [toasts, setToasts] = useState<Toast[]>([]);
-  const [mounted, setMounted] = useState(false);
-  const idCounter = useRef(0);
-
-  useEffect(() => setMounted(true), []);
-
   const removeToast = useCallback((id: string) => {
-    setToasts((prev) => prev.filter((t) => t.id !== id));
+    toast.dismiss(id as Id);
   }, []);
 
   const addToast = useCallback(
-    (toast: Omit<Toast, "id">) => {
-      const id = `toast-${++idCounter.current}-${Date.now()}`;
-      setToasts((prev) => {
-        const next = [...prev, { ...toast, id }];
-        // Keep only the newest MAX_TOASTS
-        return next.length > MAX_TOASTS ? next.slice(-MAX_TOASTS) : next;
+    (nextToast: Omit<Toast, "id">) => {
+      const id = toast(buildContent(nextToast.title, nextToast.description), {
+        type: mapType(nextToast.variant),
+        autoClose: nextToast.duration ?? 5000,
       });
-      return id;
+      return String(id);
     },
     []
   );
@@ -216,7 +129,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   );
 
   const value: ToastContextValue = {
-    toasts,
+    toasts: [],
     addToast,
     removeToast,
     success,
@@ -231,18 +144,19 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastContext.Provider value={value}>
       {children}
-      {mounted &&
-        createPortal(
-          <div
-            aria-live="polite"
-            className="pointer-events-none fixed bottom-4 right-4 z-[9999] flex flex-col gap-2 items-end"
-          >
-            {toasts.map((t) => (
-              <ToastItem key={t.id} toast={t} onDismiss={removeToast} />
-            ))}
-          </div>,
-          document.body
-        )}
+      <ToastContainer
+        position="bottom-right"
+        autoClose={5000}
+        newestOnTop
+        closeOnClick
+        pauseOnHover
+        draggable
+        limit={MAX_TOASTS}
+        theme="colored"
+        toastClassName={(ctx) => `rounded-lg shadow-lg ${mapClassName(ctx?.type)}`}
+        bodyClassName="m-0"
+        progressClassName="!bg-white/50"
+      />
     </ToastContext.Provider>
   );
 }
